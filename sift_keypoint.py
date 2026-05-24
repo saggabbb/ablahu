@@ -6,7 +6,7 @@ import os
 # ==================================================
 
 INPUT_FOLDER = 'dataset/FAKE'
-OUTPUT_FOLDER = 'dataset/OUTPUT'
+OUTPUT_FOLDER = 'dataset/KEYPOINT'
 
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
