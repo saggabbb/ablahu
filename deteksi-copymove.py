@@ -45,16 +45,21 @@ for index, img_path in enumerate(image_paths, 1):
         scale = max_width / img.shape[1]
         img = cv2.resize(img, (0, 0), fx=scale, fy=scale)
     
+    # 1. Grayscale
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     
-    clahe = cv2.createCLAHE(
-        clipLimit=2.0,
-        tileGridSize=(8,8)
-    )
-
+    # 2. Gaussian Blur (kurangi noise sebelum CLAHE)
+    gray = cv2.GaussianBlur(gray, (3, 3), 0)
+    
+    # 3. CLAHE (Pemerataan kontras adaptif)
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
     gray = clahe.apply(gray)
     
-    gray = cv2.GaussianBlur(gray, (3,3), 0)
+    # 4. Brightness & Contrast (Global adjustment)
+    gray = cv2.convertScaleAbs(gray, alpha=1.15, beta=10)
+    
+    # 5. Min-Max Normalization (Maksimalkan dynamic range)
+    gray = cv2.normalize(gray, None, 0, 255, cv2.NORM_MINMAX)
 
 
     # ====================================================================
