@@ -1,6 +1,7 @@
 import cv2
 import os
 import numpy as np
+from preprocess import preprocess_pipeline
 
 # ==================================================
 # FOLDER
@@ -32,39 +33,6 @@ target_x2, target_y2 = 440, 460
 MATCHING_METHOD = 'knn_bf'   # ganti ke 'flann' untuk metode cadangan
 LOWE_RATIO      = 0.75        # threshold Lowe's ratio test (standar: 0.75)
 
-# ==================================================
-# PRE-PROCESSING PIPELINE
-# Langkah: Grayscale → CLAHE → Gaussian Blur
-# ==================================================
-
-def preprocess(image_bgr):
-    """
-    Pre-processing citra sebelum ekstraksi fitur SIFT.
-
-    Tahapan:
-    1. Konversi ke Grayscale
-    2. CLAHE (Contrast Limited Adaptive Histogram Equalization)
-       – Meningkatkan kontras lokal secara adaptif,
-         sehingga area gelap/terang merata dan keypoint
-         lebih banyak terdeteksi.
-    3. Gaussian Blur
-       – Mereduksi noise halus agar descriptor lebih stabil.
-
-    Returns:
-        gray_clahe_blur  : hasil pre-processing (uint8, grayscale)
-        gray_original    : grayscale mentah (untuk visualisasi)
-    """
-    # 1. Grayscale
-    gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
-
-    # 2. CLAHE
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-    gray_clahe = clahe.apply(gray)
-
-    # 3. Gaussian Blur  (kernel 3x3 – tidak terlalu blur agar detail terjaga)
-    gray_blur = cv2.GaussianBlur(gray_clahe, (3, 3), 0)
-
-    return gray_blur, gray
 
 
 # ==================================================
@@ -174,7 +142,7 @@ print("\nSEMUA FOTO FAKE BERHASIL DIBUAT!\n")
 print(f"\n=== SIFT COPY-MOVE DETECTION ===")
 print(f"    Metode Matching : {MATCHING_METHOD.upper()}")
 print(f"    Lowe Ratio      : {LOWE_RATIO}")
-print(f"    Pre-processing  : Grayscale → CLAHE → Gaussian Blur\n")
+print(f"    Pre-processing  : Resize → Grayscale → Noise Reduction → CLAHE → Brightness/Contrast → Normalize\n")
 
 matcher, method_label = build_matcher(MATCHING_METHOD)
 sift = cv2.SIFT_create()
@@ -189,12 +157,11 @@ for file in fake_files:
     if img is None:
         continue
 
-    img = cv2.resize(img, (512, 512))
-
     # ──────────────────────────────────────────────────────────────────
-    # PRE-PROCESSING
+    # PRE-PROCESSING (menggunakan pipeline dari preprocess.py)
+    # Resize → Grayscale → Noise Reduction → CLAHE → Brightness/Contrast → Normalize
     # ──────────────────────────────────────────────────────────────────
-    preprocessed, gray_original = preprocess(img)
+    preprocessed = preprocess_pipeline(img)
 
     # ── Crop region source & target dari hasil pre-processing ─────────
     source_crop = preprocessed[source_y1:source_y2, source_x1:source_x2]
@@ -263,7 +230,7 @@ for file in fake_files:
     cv2.putText(result, 'SIFT COPY-MOVE ANALYSIS', (15, 30),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 255), 1)
 
-    cv2.putText(result, f'Pre-processing     : CLAHE + Gaussian Blur', (15, 55),
+    cv2.putText(result, f'Pre-processing     : Full Pipeline (preprocess.py)', (15, 55),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.4, (180, 255, 180), 1)
     cv2.putText(result, f'Metode Matching    : {method_label}', (15, 75),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.4, (180, 255, 180), 1)
@@ -305,7 +272,7 @@ for file in fake_files:
     # PRINT TERMINAL
     # ──────────────────────────────────────────────────────────────────
     print(f'\n📸 {file}')
-    print(f'   Pre-processing       : Grayscale → CLAHE → Gaussian Blur')
+    print(f'   Pre-processing       : Resize → Grayscale → Noise Reduction → CLAHE → Brightness/Contrast → Normalize')
     print(f'   Metode Matching      : {method_label}')
     print(f'   Lowe Ratio           : {LOWE_RATIO}')
     print(f'   Keypoints Source     : {len(kp1)}')
