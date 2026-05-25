@@ -1,69 +1,81 @@
 import os
-import uuid
-from flask import Flask, render_template, request, jsonify, url_for
-from werkzeug.utils import secure_filename
+import difflib
+from flask import Flask, render_template, send_from_directory, jsonify
 from detector import process_image
 
 app = Flask(__name__)
 
-# Konfigurasi Upload
-app.config['UPLOAD_FOLDER'] = os.path.join('static', 'uploads')
-app.config['RESULT_FOLDER'] = os.path.join('static', 'results')
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024 # Max 16MB
-
-# Pastikan folder ada
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-os.makedirs(app.config['RESULT_FOLDER'], exist_ok=True)
-
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp'}
-
-def allowed_file(filename):
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+# Direktori data
+DATASET_DIR = os.path.abspath('dataset')
+OUTPUT_DIR = os.path.abspath('output')
 
 @app.route('/')
 def index():
+    # Mengirimkan antarmuka web
     return render_template('index.html')
 
-@app.route('/detect', methods=['POST'])
-def detect():
-    # Cek apakah ada file dalam request
-    if 'image' not in request.files:
-        return jsonify({'error': 'Tidak ada file gambar yang diunggah.'}), 400
+@app.route('/api/results')
+def get_results():
+    """Mengembalikan daftar semua gambar hasil analisis di folder output."""
+    if not os.path.exists(OUTPUT_DIR):
+        return jsonify([])
+        
+    results = []
+    # Ambil semua file gambar di output
+    extensions = {'.png', '.jpg', '.jpeg', '.webp'}
+    for filename in os.listdir(OUTPUT_DIR):
+        ext = os.path.splitext(filename)[1].lower()
+        if ext in extensions:
+            results.append(filename)
+            
+    # Sortir berdasarkan nama file agar rapi
+    results.sort()
+    return jsonify(results)
+
+@app.route('/image/output/<path:filename>')
+def serve_output(filename):
+    """Serve gambar dari folder output."""
+    return send_from_directory(OUTPUT_DIR, filename)
+
+def find_original_image(filename):
+    """Mencari gambar asli di dataset. Jika tidak ada yang sama persis, gunakan fuzzy match."""
+    # 1. Exact match
+    exact_path = os.path.join(DATASET_DIR, filename)
+    if os.path.exists(exact_path):
+        return exact_path
+        
+    # 2. Fuzzy match (karena kadang nama di output ketambahan/kurang digit '1' atau lainnya)
+    if os.path.exists(DATASET_DIR):
+        all_files = os.listdir(DATASET_DIR)
+        matches = difflib.get_close_matches(filename, all_files, n=1, cutoff=0.8)
+        if matches:
+            return os.path.join(DATASET_DIR, matches[0])
+            
+    return None
+
+@app.route('/image/dataset/<path:filename>')
+def serve_dataset(filename):
+    """Serve gambar asli."""
+    target_path = find_original_image(filename)
+    if target_path:
+        return send_from_directory(os.path.dirname(target_path), os.path.basename(target_path))
     
-    file = request.files['image']
-    
-    if file.filename == '':
-        return jsonify({'error': 'Nama file kosong.'}), 400
-        
-    if file and allowed_file(file.filename):
-        # Buat nama unik agar tidak tertimpa
-        ext = file.filename.rsplit('.', 1)[1].lower()
-        unique_filename = f"{uuid.uuid4().hex}.{ext}"
-        
-        input_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
-        output_path = os.path.join(app.config['RESULT_FOLDER'], unique_filename)
-        
-        # Simpan file yang diunggah
-        file.save(input_path)
-        
-        # Proses gambar
-        try:
-            result_data = process_image(input_path, output_path)
+    # Fallback jika tidak ketemu
+    return send_from_directory(DATASET_DIR, filename)
+
+@app.route('/api/analyze/<path:filename>')
+def analyze_image(filename):
+    """
+    Menjalankan proses deteksi secara dinamis tanpa menyimpan gambar,
+    hanya untuk mendapatkan hasil analisis JSON yang akurat.
+    """
+    target_path = find_original_image(filename)
             
-            if "error" in result_data:
-                return jsonify({'error': result_data["error"]}), 500
-                
-            # Tambahkan URL gambar untuk ditampilkan di frontend
-            result_data['original_url'] = url_for('static', filename=f"uploads/{unique_filename}")
-            result_data['result_url'] = url_for('static', filename=f"results/{unique_filename}")
-            
-            return jsonify(result_data)
-            
-        except Exception as e:
-            return jsonify({'error': str(e)}), 500
-            
-    return jsonify({'error': 'Format file tidak diizinkan. Hanya JPG, PNG, WEBP.'}), 400
+    if not target_path:
+        return jsonify({"error": "Gambar asli tidak ditemukan."}), 404
+        
+    result = process_image(target_path, output_path=None)
+    return jsonify(result)
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

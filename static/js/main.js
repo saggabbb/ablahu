@@ -1,164 +1,148 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // Elements
-    const dropZone = document.getElementById('dropZone');
-    const fileInput = document.getElementById('fileInput');
-    const previewZone = document.getElementById('previewZone');
-    const imagePreview = document.getElementById('imagePreview');
-    const btnCancel = document.getElementById('btnCancel');
-    const btnProcess = document.getElementById('btnProcess');
     
-    const uploadPanel = document.getElementById('uploadPanel');
-    const loadingState = document.getElementById('loadingState');
+    // DOM Elements
+    const galleryGrid = document.getElementById('galleryGrid');
+    const loadingGallery = document.getElementById('loadingGallery');
+    const totalCount = document.getElementById('totalCount');
+    
+    const emptyState = document.getElementById('emptyState');
     const resultDashboard = document.getElementById('resultDashboard');
     
+    const currentFileName = document.getElementById('currentFileName');
+    const resOriginal = document.getElementById('resOriginal');
+    const resOutput = document.getElementById('resOutput');
+    
+    const analysisLoading = document.getElementById('analysisLoading');
+    const analysisLoadingText = document.getElementById('analysisLoadingText');
+    const analysisContent = document.getElementById('analysisContent');
     const statusBanner = document.getElementById('statusBanner');
     const valKeypoints = document.getElementById('valKeypoints');
     const valMatches = document.getElementById('valMatches');
-    const valResolution = document.getElementById('valResolution');
+    const analysisInterpretation = document.getElementById('analysisInterpretation');
     
-    const resOriginal = document.getElementById('resOriginal');
-    const resOutput = document.getElementById('resOutput');
-    const btnNewScan = document.getElementById('btnNewScan');
-
-    let currentFile = null;
-
-    // --- Drag & Drop Handlers ---
-    dropZone.addEventListener('click', () => fileInput.click());
-
-    dropZone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        dropZone.classList.add('dragover');
-    });
-
-    dropZone.addEventListener('dragleave', () => {
-        dropZone.classList.remove('dragover');
-    });
-
-    dropZone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        dropZone.classList.remove('dragover');
-        
-        if (e.dataTransfer.files.length > 0) {
-            handleFile(e.dataTransfer.files[0]);
-        }
-    });
-
-    fileInput.addEventListener('change', (e) => {
-        if (e.target.files.length > 0) {
-            handleFile(e.target.files[0]);
-        }
-    });
-
-    function handleFile(file) {
-        // Validasi ekstensi
-        const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-        if (!validTypes.includes(file.type)) {
-            alert('Format tidak didukung. Harap unggah gambar JPG, PNG, atau WEBP.');
-            return;
-        }
-
-        currentFile = file;
-        
-        // Buat URL sementara untuk preview
-        const objectUrl = URL.createObjectURL(file);
-        imagePreview.src = objectUrl;
-        
-        // Sembunyikan drop zone, tampilkan preview
-        dropZone.classList.add('hidden');
-        previewZone.classList.remove('hidden');
-    }
-
-    // --- Actions ---
-    btnCancel.addEventListener('click', () => {
-        resetUploader();
-    });
-
-    btnNewScan.addEventListener('click', () => {
-        resultDashboard.classList.add('hidden');
-        uploadPanel.classList.remove('hidden');
-        resetUploader();
-    });
-
-    function resetUploader() {
-        currentFile = null;
-        fileInput.value = '';
-        previewZone.classList.add('hidden');
-        dropZone.classList.remove('hidden');
-    }
-
-    // --- Proses Data ---
-    btnProcess.addEventListener('click', async () => {
-        if (!currentFile) return;
-
-        // UI State: Loading
-        uploadPanel.classList.add('hidden');
-        loadingState.classList.remove('hidden');
-
-        // Siapkan Form Data
-        const formData = new FormData();
-        formData.append('image', currentFile);
-
+    // Fetch Data
+    fetchGalleryData();
+    
+    async function fetchGalleryData() {
         try {
-            const response = await fetch('/detect', {
-                method: 'POST',
-                body: formData
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.error || 'Terjadi kesalahan pada server');
+            const res = await fetch('/api/results');
+            const files = await res.json();
+            
+            loadingGallery.classList.add('hidden');
+            totalCount.textContent = files.length;
+            
+            if(files.length === 0) {
+                galleryGrid.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: var(--text-muted); font-size: 0.9rem;">Tidak ada hasil ditemukan.</p>';
+                return;
             }
-
-            // Sukses: Update UI dengan data
-            populateDashboard(data);
-
-            // UI State: Selesai
-            loadingState.classList.add('hidden');
-            resultDashboard.classList.remove('hidden');
-
-        } catch (error) {
-            alert(`Gagal: ${error.message}`);
-            // Kembalikan ke panel upload
-            loadingState.classList.add('hidden');
-            uploadPanel.classList.remove('hidden');
+            
+            // Render Thumbnails
+            files.forEach(filename => {
+                const thumb = document.createElement('div');
+                thumb.className = 'thumbnail-item';
+                // Gunakan endpoint output untuk thumbnail agar cepat (bisa diganti jika terlalu berat)
+                thumb.innerHTML = `
+                    <img src="/image/output/${filename}" alt="${filename}" loading="lazy">
+                    <div class="thumbnail-name">${filename}</div>
+                `;
+                
+                thumb.addEventListener('click', () => {
+                    // Remove active class from all
+                    document.querySelectorAll('.thumbnail-item').forEach(el => el.classList.remove('active'));
+                    thumb.classList.add('active');
+                    showDetails(filename);
+                });
+                
+                galleryGrid.appendChild(thumb);
+            });
+            
+        } catch (err) {
+            console.error("Gagal memuat galeri:", err);
+            loadingGallery.innerHTML = '<p class="text-red">Gagal memuat data.</p>';
         }
-    });
-
-    function populateDashboard(data) {
-        // Render Images
-        resOriginal.src = data.original_url;
-        // Tambah query param agar browser tidak cache hasil yg namanya mungkin sama
-        resOutput.src = `${data.result_url}?t=${new Date().getTime()}`;
-
-        // Render Stats
-        valKeypoints.textContent = data.keypoints.toLocaleString();
-        valMatches.textContent = data.matches.toLocaleString();
-        valResolution.textContent = `${data.width}x${data.height}`;
-
-        // Render Status Banner
-        if (data.is_forged) {
-            statusBanner.className = 'status-banner status-danger';
-            statusBanner.innerHTML = `
-                <i class="fa-solid fa-triangle-exclamation"></i>
-                <div>
-                    <div><strong>TERINDIKASI COPY-MOVE FORGERY</strong></div>
-                    <div style="font-size: 0.85rem; font-weight: 400; margin-top: 2px;">
-                        Algoritma SIFT mendeteksi ${data.matches} pasangan area yang identik. Garis hijau menunjukkan titik yang digandakan.
-                    </div>
-                </div>
-            `;
-        } else {
-            statusBanner.className = 'status-banner status-safe';
-            statusBanner.innerHTML = `
-                <i class="fa-solid fa-shield-check"></i>
-                <div>
-                    <div><strong>TIDAK TERDETEKSI MANIPULASI</strong></div>
-                    <div style="font-size: 0.85rem; font-weight: 400; margin-top: 2px;">
-                        Gambar terlihat normal. Tidak ditemukan area fitur lokal yang digandakan secara signifikan.
-                    </div>
-                </div>
-            `;
-        }
+    }
+    
+    function showDetails(filename) {
+        // Sembunyikan state kosong, tampilkan detail
+        emptyState.classList.add('hidden');
+        resultDashboard.classList.remove('hidden');
+        
+        currentFileName.textContent = filename;
+        
+        // Tampilkan state loading analisis
+        analysisContent.classList.add('hidden');
+        analysisLoading.classList.remove('hidden');
+        analysisLoadingText.classList.remove('hidden');
+        
+        // Animasi fade in ringan untuk gambar
+        resOriginal.style.opacity = 0;
+        resOutput.style.opacity = 0;
+        
+        // Set Source Gambar
+        resOriginal.src = `/image/dataset/${filename}`;
+        resOutput.src = `/image/output/${filename}`;
+        
+        // Kembalikan opacity setelah gambar dimuat
+        resOriginal.onload = () => { resOriginal.style.opacity = 1; resOriginal.style.transition = "opacity 0.5s ease"; };
+        resOutput.onload = () => { resOutput.style.opacity = 1; resOutput.style.transition = "opacity 0.5s ease"; };
+        
+        // Fetch Analisis SIFT
+        fetch(`/api/analyze/${filename}`)
+            .then(res => res.json())
+            .then(data => {
+                analysisLoading.classList.add('hidden');
+                analysisLoadingText.classList.add('hidden');
+                
+                if (data.error) {
+                    analysisContent.classList.remove('hidden');
+                    analysisContent.innerHTML = `<p class="text-red">Gagal menganalisis: ${data.error}</p>`;
+                    return;
+                }
+                
+                analysisContent.classList.remove('hidden');
+                
+                // Set Nilai Stats
+                valKeypoints.textContent = data.keypoints.toLocaleString();
+                valMatches.textContent = data.matches.toLocaleString();
+                
+                // Set Status & Interpretasi
+                if (data.is_forged) {
+                    statusBanner.className = 'status-banner status-danger';
+                    statusBanner.innerHTML = `
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        <div>
+                            <div><strong>TERINDIKASI COPY-MOVE FORGERY</strong></div>
+                        </div>
+                    `;
+                    
+                    analysisInterpretation.innerHTML = `
+                        Algoritma SIFT mendeteksi adanya <strong>${data.keypoints.toLocaleString()}</strong> titik fitur (keypoints) pada gambar ini. 
+                        Setelah dicocokkan menggunakan algoritma FLANN dan difilter dengan <em>Lowe's Ratio Test</em> beserta validasi spasial RANSAC, 
+                        ditemukan <strong>${data.matches}</strong> pasangan titik yang memiliki kemiripan identik dan posisi yang konsisten secara geometris. 
+                        <br><br>
+                        Kehadiran ${data.matches} titik identik di lokasi yang berbeda ini <strong>sangat mengindikasikan</strong> bahwa sebuah area pada gambar telah disalin (di-copy) dan ditempel (di-paste) ke bagian lain. Garis hijau pada gambar hasil menghubungkan area sumber dan area salinannya.
+                    `;
+                } else {
+                    statusBanner.className = 'status-banner status-safe';
+                    statusBanner.innerHTML = `
+                        <i class="fa-solid fa-shield-check"></i>
+                        <div>
+                            <div><strong>TIDAK TERDETEKSI MANIPULASI</strong></div>
+                        </div>
+                    `;
+                    
+                    analysisInterpretation.innerHTML = `
+                        Algoritma SIFT mengekstrak <strong>${data.keypoints.toLocaleString()}</strong> titik fitur dari gambar ini. 
+                        Berdasarkan pemindaian menyeluruh, sistem hanya menemukan <strong>${data.matches}</strong> kecocokan yang lolos filter (kurang dari batas minimum 4 kecocokan).
+                        <br><br>
+                        Kesimpulannya, gambar ini terlihat <strong>normal dan bersih</strong>. Tidak ada pola penggandaan fitur lokal yang signifikan yang mengarah pada manipulasi <em>copy-move</em>.
+                    `;
+                }
+            })
+            .catch(err => {
+                console.error("Analysis Error:", err);
+                analysisLoading.classList.add('hidden');
+                analysisLoadingText.textContent = "Gagal memuat analisis statis.";
+            });
     }
 });

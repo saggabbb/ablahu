@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import os
 
-def process_image(input_path, output_path):
+def process_image(input_path, output_path=None):
     """
     Memproses gambar tunggal untuk deteksi copy-move menggunakan SIFT.
     Mengembalikan dictionary berisi data analisis.
@@ -45,7 +45,8 @@ def process_image(input_path, output_path):
     keypoints, descriptors = sift.detectAndCompute(gray, None)
 
     if descriptors is None or len(descriptors) < 3:
-        cv2.imwrite(output_path, img)
+        if output_path is not None:
+            cv2.imwrite(output_path, img)
         return {
             "error": "Fitur SIFT terlalu sedikit untuk dianalisis.",
             "keypoints": len(keypoints) if keypoints else 0,
@@ -115,7 +116,8 @@ def process_image(input_path, output_path):
     cv2.putText(img_out, f'Matches: {len(good_matches)}', (20, 75), 
                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, match_color, 2, cv2.LINE_AA)
 
-    cv2.imwrite(output_path, img_out)
+    if output_path is not None:
+        cv2.imwrite(output_path, img_out)
 
     # ====================================================================
     # 6. ANALISIS HASIL

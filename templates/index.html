@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Copy-Move Forgery Detection</title>
+    <title>Copy-Move Forgery Detection - Dashboard</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -13,92 +13,97 @@
     <div class="glow-orb orb-1"></div>
     <div class="glow-orb orb-2"></div>
 
-    <div class="container">
+    <div class="container fluid">
         <header>
-            <h1><i class="fa-solid fa-microscope text-cyan"></i> CMFD <span class="text-emerald">Analyzer</span></h1>
-            <p class="subtitle">Deteksi Manipulasi Gambar Copy-Move Menggunakan Algoritma SIFT & RANSAC</p>
+            <h1><i class="fa-solid fa-microscope text-cyan"></i> CMFD <span class="text-emerald">Gallery Dashboard</span></h1>
+            <p class="subtitle">Hasil Analisis Batch Copy-Move Detection</p>
         </header>
 
-        <main>
-            <!-- Area Upload -->
-            <section class="upload-section glass-panel" id="uploadPanel">
-                <div class="drop-zone" id="dropZone">
-                    <input type="file" id="fileInput" accept="image/png, image/jpeg, image/jpg, image/webp" hidden>
-                    <div class="drop-content">
-                        <i class="fa-solid fa-cloud-arrow-up fa-3x mb-3 text-cyan"></i>
-                        <h3>Tarik & Lepas Gambar ke Sini</h3>
-                        <p>Atau klik untuk menelusuri file lokal</p>
-                        <span class="formats">Format didukung: JPG, PNG, WEBP</span>
-                    </div>
+        <main class="dashboard-layout">
+            <!-- Sidebar / Gallery Grid -->
+            <aside class="gallery-sidebar glass-panel">
+                <div class="sidebar-header">
+                    <h3><i class="fa-regular fa-images"></i> Daftar Hasil</h3>
+                    <span class="badge" id="totalCount">0</span>
                 </div>
                 
-                <!-- Preview Sebelum Proses -->
-                <div class="preview-zone hidden" id="previewZone">
-                    <img id="imagePreview" src="" alt="Preview">
-                    <div class="preview-actions">
-                        <button class="btn btn-outline" id="btnCancel"><i class="fa-solid fa-xmark"></i> Batal</button>
-                        <button class="btn btn-primary" id="btnProcess"><i class="fa-solid fa-microchip"></i> Deteksi Manipulasi</button>
+                <div class="loading-gallery" id="loadingGallery">
+                    <div class="spinner-small"></div>
+                    <p>Memuat data...</p>
+                </div>
+
+                <div class="gallery-grid" id="galleryGrid">
+                    <!-- Thumbnail di-*render* via JS -->
+                </div>
+            </aside>
+
+            <!-- Main Detail View -->
+            <section class="detail-view">
+                <!-- State Kosong (Belum ada yang dipilih) -->
+                <div class="empty-state glass-panel" id="emptyState">
+                    <i class="fa-regular fa-hand-pointer fa-4x text-cyan mb-3"></i>
+                    <h2>Pilih Gambar</h2>
+                    <p>Pilih salah satu gambar dari daftar di sebelah kiri untuk melihat detail analisis Copy-Move Forgery.</p>
+                </div>
+
+                <!-- State Detail (Gambar dipilih) -->
+                <div class="result-dashboard hidden" id="resultDashboard">
+                    <div class="result-header glass-panel mb-3">
+                        <h2><i class="fa-solid fa-file-image text-emerald"></i> <span id="currentFileName">filename.png</span></h2>
                     </div>
-                </div>
-            </section>
-
-            <!-- Loading State -->
-            <section class="loading-state hidden" id="loadingState">
-                <div class="spinner"></div>
-                <h3 class="loading-text">Menjalankan SIFT Extraction & RANSAC...</h3>
-                <p>Memproses gambar, mendeteksi keypoints, dan menganalisis kecocokan spasial.</p>
-            </section>
-
-            <!-- Dashboard Hasil -->
-            <section class="result-dashboard hidden" id="resultDashboard">
-                <div class="result-header">
-                    <h2><i class="fa-solid fa-chart-pie"></i> Hasil Analisis</h2>
-                    <button class="btn btn-outline-sm" id="btnNewScan"><i class="fa-solid fa-rotate-right"></i> Scan Baru</button>
-                </div>
-
-                <div class="status-banner" id="statusBanner">
-                    <!-- Dinamis via JS -->
-                </div>
-
-                <div class="stats-grid">
-                    <div class="stat-card glass-panel">
-                        <div class="stat-icon text-cyan"><i class="fa-solid fa-circle-nodes"></i></div>
-                        <div class="stat-info">
-                            <h4>Total Keypoints</h4>
-                            <span class="stat-value" id="valKeypoints">0</span>
+                    
+                    <!-- Area Analisis Dinamis -->
+                    <div class="analysis-section" id="analysisSection">
+                        <div class="spinner-small" id="analysisLoading"></div>
+                        <p id="analysisLoadingText" style="text-align: center; color: var(--text-muted); margin-bottom: 1rem;">Menganalisis fitur SIFT...</p>
+                        
+                        <div id="analysisContent" class="hidden">
+                            <div class="status-banner" id="statusBanner">
+                                <!-- Dinamis via JS -->
+                            </div>
+                            
+                            <div class="stats-grid" style="margin-bottom: 1.5rem;">
+                                <div class="stat-card glass-panel" style="padding: 1rem;">
+                                    <div class="stat-info">
+                                        <h4>Total Keypoints</h4>
+                                        <span class="stat-value text-cyan" id="valKeypoints">0</span>
+                                    </div>
+                                </div>
+                                <div class="stat-card glass-panel" style="padding: 1rem;">
+                                    <div class="stat-info">
+                                        <h4>Copy-Move Matches</h4>
+                                        <span class="stat-value text-emerald" id="valMatches">0</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="glass-panel" style="padding: 1rem; margin-bottom: 1.5rem; border-left: 4px solid var(--purple);">
+                                <h4 style="margin-bottom: 0.5rem; color: var(--text-muted); font-weight: 500;"><i class="fa-solid fa-circle-info text-purple"></i> Interpretasi Hasil</h4>
+                                <p id="analysisInterpretation" style="font-size: 0.95rem; line-height: 1.5; color: var(--text-main);"></p>
+                            </div>
                         </div>
                     </div>
-                    <div class="stat-card glass-panel">
-                        <div class="stat-icon text-emerald"><i class="fa-solid fa-link"></i></div>
-                        <div class="stat-info">
-                            <h4>Copy-Move Matches</h4>
-                            <span class="stat-value" id="valMatches">0</span>
-                        </div>
-                    </div>
-                    <div class="stat-card glass-panel">
-                        <div class="stat-icon text-purple"><i class="fa-solid fa-expand"></i></div>
-                        <div class="stat-info">
-                            <h4>Resolusi Analisis</h4>
-                            <span class="stat-value" id="valResolution">0x0</span>
-                        </div>
-                    </div>
-                </div>
 
-                <div class="image-comparison">
-                    <div class="img-box glass-panel">
-                        <h4><i class="fa-regular fa-image"></i> Gambar Asli</h4>
-                        <img id="resOriginal" src="" alt="Gambar Asli">
-                    </div>
-                    <div class="img-box glass-panel">
-                        <h4><i class="fa-solid fa-magnifying-glass-chart"></i> Hasil Deteksi</h4>
-                        <img id="resOutput" src="" alt="Hasil Deteksi">
+                    <div class="image-comparison">
+                        <div class="img-box glass-panel">
+                            <h4><i class="fa-regular fa-image text-cyan"></i> Gambar Asli</h4>
+                            <div class="img-wrapper">
+                                <img id="resOriginal" src="" alt="Gambar Asli">
+                            </div>
+                        </div>
+                        <div class="img-box glass-panel">
+                            <h4><i class="fa-solid fa-magnifying-glass-chart text-emerald"></i> Hasil Deteksi SIFT + RANSAC</h4>
+                            <div class="img-wrapper">
+                                <img id="resOutput" src="" alt="Hasil Deteksi">
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>
         </main>
 
         <footer>
-            <p>&copy; 2026 Copy-Move Forgery Detection Project. Dibangun dengan Flask & OpenCV.</p>
+            <p>&copy; 2026 Copy-Move Forgery Detection Project.</p>
         </footer>
     </div>
 
