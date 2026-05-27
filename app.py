@@ -1,7 +1,7 @@
 import os
 import difflib
 from flask import Flask, render_template, send_from_directory, jsonify
-from detector import process_image
+from deteksi_copymove import process_image
 
 app = Flask(__name__)
 
